@@ -721,7 +721,11 @@ class WatsonXModel(BaseModel):
         # Initialize MODELS/SHORTCUTS
         if not self.__class__.MODELS:
             self.__class__.MODELS.update({
-                entry.value: {}
+                entry.value: {
+                    # TODO: Real values here
+                    "cost_per_input_token": 1,
+                    "cost_per_output_token": 1,
+                }
                 for entry in ModelTypes
             })
             self.__class__.SHORTCUTS.update({
@@ -764,7 +768,24 @@ class WatsonXModel(BaseModel):
         """
         Query the watsonx model
         """
+        # Format the prompt from the history
+        prompt = "\n".join([
+            "<|{role}|>{content}".format(**entry)
+            for entry in history
+        ])
 
+        # Peform the generation
+        results = self.model.generate(prompt).get("results")
+        assert results and len(results) == 1
+        result = results[0]
+
+        # Update stats
+        input_tokens = result["input_token_count"]
+        output_tokens = result["generated_token_count"]
+        self.update_stats(input_tokens, output_tokens)
+
+        # Return the text
+        return result["generated_text"]
 
 
 def get_model(args: ModelArguments, commands: Optional[list[Command]] = None):
