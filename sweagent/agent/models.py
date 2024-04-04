@@ -1,3 +1,4 @@
+import abc
 import config
 import json
 import logging
@@ -67,7 +68,7 @@ class CostLimitExceededError(Exception):
     pass
 
 
-class BaseModel:
+class BaseModel(abc.ABC):
     MODELS = {}
     SHORTCUTS = {}
 
@@ -166,8 +167,9 @@ class BaseModel:
             raise CostLimitExceededError("Instance cost limit exceeded")
         return cost
 
+    @abc.abstractmethod
     def query(self, history: list[dict[str, str]]) -> str:
-        raise NotImplementedError("Use a subclass of BaseModel")
+        """Child implementations must implement query"""
 
 
 class OpenAIModel(BaseModel):
