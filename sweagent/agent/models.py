@@ -98,9 +98,15 @@ class BaseModel(abc.ABC):
         elif args.model_name.startswith("ollama:"):
             self.api_model = args.model_name.split('ollama:', 1)[1]
             self.model_metadata = self.MODELS[self.api_model]
+<<<<<<< HEAD
         elif args.model_name.startswith("azure:"):
             azure_model = args.model_name.split("azure:", 1)[1]
             self.model_metadata = MODELS[azure_model]
+=======
+        elif args.model_name.startswith("watsonx:"):
+            self.api_model = args.model_name.split('watsonx:', 1)[1]
+            self.model_metadata = self.MODELS[self.api_model]
+>>>>>>> 965ce5e (WatsonxSupport: Initial impl of construction for WatsonXModel)
         else:
             raise ValueError(f"Unregistered model ({args.model_name}). Add model name to MODELS metadata to {self.__class__}")
 
@@ -691,6 +697,76 @@ class ReplayModel(BaseModel):
         return action
 
 
+class WatsonXModel(BaseModel):
+    """
+    Models via IBM's watsonx
+    """
+
+    DEFAULT_URL = "https://us-south.ml.cloud.ibm.com"
+
+    # These will be initialized on the first construction to avoid proactive
+    # imports of optional dependencies
+    MODELS = {}
+    SHORTCUTS = {}
+
+    def __init__(self, args: ModelArguments, commands: list[Command]):
+        """
+        Initialize with a connection to watsonx
+        """
+        # Local imports for optional dependencies
+        from ibm_watson_machine_learning.foundation_models import Model as WXModel
+        from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
+        from ibm_watson_machine_learning.foundation_models.utils.enums import ModelTypes
+
+        # Initialize MODELS/SHORTCUTS
+        if not self.__class__.MODELS:
+            self.__class__.MODELS.update({
+                entry.value: {}
+                for entry in ModelTypes
+            })
+            self.__class__.SHORTCUTS.update({
+                "watsonx:{}".format(entry.name.lower().replace("_", "-")): entry.value
+                for entry in ModelTypes
+            })
+
+        # Initialize parent after populating MODELS/SHORTCUTS
+        super().__init__(args, commands)
+
+        # Full URL for the service endpoint
+        url = (
+            args.host_url
+            if args.host_url != ModelArguments("").host_url
+            else self.DEFAULT_URL
+        )
+
+        # API secrets
+        # TODO: pull this from config
+        apikey = os.getenv("WX_APIKEY", "")
+        project_id = os.getenv("WX_PROJECT_ID", "")
+
+        # Initialize the model handle
+        self.model = WXModel(
+            model_id = self.api_model,
+            credentials = {
+                "apikey": apikey,
+                "url": url,
+            },
+            params={
+                GenParams.MAX_NEW_TOKENS: 900,
+                GenParams.REPETITION_PENALTY: 1.05,
+                GenParams.TEMPERATURE: args.temperature,
+                GenParams.TOP_P: args.top_p,
+            },
+            project_id=project_id,
+        )
+
+    def query(self, history: list[dict[str, str]]) -> str:
+        """
+        Query the watsonx model
+        """
+
+
+
 def get_model(args: ModelArguments, commands: Optional[list[Command]] = None):
     """
     Returns correct model object given arguments and commands
@@ -710,5 +786,7 @@ def get_model(args: ModelArguments, commands: Optional[list[Command]] = None):
         return AnthropicModel(args, commands)
     elif args.model_name.startswith("ollama"):
         return OllamaModel(args, commands)
+    elif args.model_name.startswith("watsonx"):
+        return WatsonXModel(args, commands)
     else:
         raise ValueError(f"Invalid model name: {args.model_name}")
