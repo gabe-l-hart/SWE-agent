@@ -19,3 +19,5 @@ dependencies:
     - simple-parsing
     - together
     - ollama
+    - ibm-watson-machine-learning
+    - requests
