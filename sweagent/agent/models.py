@@ -723,8 +723,9 @@ class WatsonXModel(BaseModel):
             self.__class__.MODELS.update({
                 entry.value: {
                     # TODO: Real values here
-                    "cost_per_input_token": 1,
-                    "cost_per_output_token": 1,
+                    "cost_per_input_token": 1e-08,
+                    "cost_per_output_token": 1e-08,
+                    "max_context": 4096,
                 }
                 for entry in ModelTypes
             })
